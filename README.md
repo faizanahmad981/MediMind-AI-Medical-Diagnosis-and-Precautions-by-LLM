@@ -7,6 +7,7 @@
 
 ## 🚀 Features
 
+
 - 📷 **Medical Image Upload:** Upload medical images in `.png`, `.jpg`, or `.jpeg` formats.
 - 🤖 **AI Analysis:** Analyze the uploaded image using Gemini's advanced vision-language capabilities.
 - 📝 **Structured Report:** Get insights including:

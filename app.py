@@ -1,3 +1,4 @@
+import base64
 import html
 import os
 import re
@@ -70,7 +71,6 @@ Rules:
 4. Be concise, clinical, and structured. Do not add a title before the first ## heading.
 """
 
-# Free tier: flash-lite ≈ 15 RPM / 500 RPD vs flash ≈ 5 RPM / 20 RPD
 model = None
 if api_key:
     model = genai.GenerativeModel(
@@ -97,7 +97,7 @@ def report_to_html(text: str) -> str:
             if in_list:
                 blocks.append("</ul>")
                 in_list = False
-            blocks.append(f"<h2>{inline_format(stripped[3:])}</h2>")
+            blocks.append(f"<h3>{inline_format(stripped[3:])}</h3>")
             continue
 
         if stripped.startswith(("- ", "* ")):
@@ -124,9 +124,13 @@ def report_to_html(text: str) -> str:
     return "\n".join(blocks)
 
 
+def to_data_uri(data: bytes, mime: str = "image/jpeg") -> str:
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
 st.set_page_config(
-    page_title="Medi-Mind AI",
-    page_icon="🩺",
+    page_title="MediMind — Image Review",
+    page_icon="images/Logo.jpg" if Path("images/Logo.jpg").exists() else None,
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -134,27 +138,34 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap');
 
 :root {
-  --ink: #102a2e;
-  --muted: #5a7278;
-  --teal: #0f766e;
-  --teal-deep: #0b4f4a;
-  --line: rgba(16, 42, 46, 0.10);
-  --panel: rgba(255, 255, 255, 0.78);
+  --ink: #10232b;
+  --muted: #4d6670;
+  --line: #6f8f9a;
+  --line-soft: #9bb4bc;
+  --surface: #f3f8f9;
+  --surface-2: #e7f1f3;
+  --accent: #0f7c6e;
+  --accent-deep: #0b5a50;
+  --navy: #0d3640;
+  --viewer: #0a1519;
+  --warn-bg: #fff4df;
+  --warn-ink: #6a4d1d;
+  --warn-line: #d9b56a;
 }
 
 html, body, [class*="css"] {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   color: var(--ink);
 }
 
 .stApp {
   background:
-    radial-gradient(900px 420px at 8% -10%, rgba(15, 118, 110, 0.18), transparent 60%),
-    radial-gradient(700px 380px at 100% 0%, rgba(180, 140, 90, 0.12), transparent 55%),
-    linear-gradient(180deg, #f7f5f0 0%, #eef6f5 45%, #f4f7f6 100%);
+    radial-gradient(900px 420px at 0% 0%, rgba(15, 124, 110, 0.18), transparent 55%),
+    radial-gradient(800px 380px at 100% 10%, rgba(30, 90, 120, 0.16), transparent 50%),
+    linear-gradient(165deg, #c5d8de 0%, #d7e6ea 42%, #cfdfe4 100%);
 }
 
 header[data-testid="stHeader"] {
@@ -164,241 +175,297 @@ header[data-testid="stHeader"] {
 #MainMenu, footer { visibility: hidden; }
 
 .block-container {
-  padding-top: 3.5rem !important;
-  padding-bottom: 4rem !important;
-  max-width: 1120px !important;
+  padding-top: 2.75rem !important;
+  padding-bottom: 3rem !important;
+  max-width: 1200px !important;
   overflow: visible !important;
 }
 
-section.main > div { overflow: visible !important; }
-
+section.main > div,
 div[data-testid="stVerticalBlock"],
 div[data-testid="stHorizontalBlock"],
 div[data-testid="column"] {
   overflow: visible !important;
+  gap: 0.85rem !important;
 }
 
-.logo-wrap {
-  margin: 0.35rem 0 0.85rem;
-  overflow: visible;
+.app-shell {
+  border: 2px solid #4f737d;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #123c46 0%, #0d3038 100%);
+  padding: 0.95rem 1.05rem 1.05rem;
+  box-shadow: 0 18px 40px rgba(10, 35, 42, 0.22);
+  margin-bottom: 0.95rem;
 }
 
-.logo-wrap [data-testid="stImage"] img {
-  display: block !important;
-  object-fit: contain !important;
-  max-height: 96px !important;
-  width: auto !important;
-  border-radius: 12px;
-}
-
-.scan-image [data-testid="stImage"] img {
-  display: block !important;
-  width: 100% !important;
-  max-height: none !important;
-  height: auto !important;
-  object-fit: contain !important;
-  border-radius: 12px;
-  background: #0d1a1c;
-}
-
-.brand-wrap {
+.app-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.85rem;
 }
 
-.brand-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #12857c, #0b4f4a);
-  color: #f4fffd;
+.app-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.app-bar-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid #6f98a3;
+  background: #071318;
+  flex-shrink: 0;
+}
+
+.app-bar-copy h1 {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #edf7f8;
+  line-height: 1.15;
+}
+
+.app-bar-copy p {
+  margin: 0.15rem 0 0;
+  color: #9fc0c8;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2px solid #6f98a3;
+  background: rgba(231, 241, 243, 0.12);
+  color: #d7ecef;
+  border-radius: 999px;
+  padding: 0.34rem 0.78rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-chip.ok { border-color: #3dbf8f; }
+.status-chip.bad { border-color: #e0a35d; color: #ffe3bd; }
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3dbf8f;
+}
+
+.status-chip.bad .status-dot { background: #e0a35d; }
+
+.control-strip {
+  background: var(--surface);
+  border: 2px solid #6f8f9a;
+  border-radius: 10px;
+  padding: 0.85rem 0.95rem 0.95rem;
+}
+
+.section-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #355860;
+}
+
+.pane {
+  background: var(--surface);
+  border: 2px solid #5f818c;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(16, 45, 52, 0.10);
+  min-height: 430px;
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.78rem 0.95rem;
+  border-bottom: 2px solid #b7cdd4;
+  background: linear-gradient(180deg, #eaf4f6 0%, #ddecef 100%);
+}
+
+.pane-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.pane-meta {
+  color: #4d6670;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.viewer-body {
+  background: radial-gradient(circle at 50% 35%, #1a2d35 0%, var(--viewer) 70%);
+  min-height: 360px;
+  padding: 0.9rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Fraunces', serif;
-  font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.03em;
-  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.28);
 }
 
-.brand-title {
-  font-family: 'Fraunces', serif;
-  font-size: clamp(2rem, 4vw, 2.7rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  margin: 0;
-  color: var(--ink);
+.viewer-body img {
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 2px solid #2d4650;
 }
 
-.brand-sub {
-  margin: 0.45rem 0 0;
-  color: var(--muted);
-  font-size: 1.02rem;
-  max-width: 40rem;
-  line-height: 1.5;
+.report-body {
+  padding: 1rem 1.1rem 1.2rem;
+  background: linear-gradient(180deg, #f7fbfc 0%, #eef6f7 100%);
 }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 1.15rem 1.25rem 1.3rem;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 30px rgba(16, 42, 46, 0.05);
-}
-
-.panel-label {
-  font-size: 0.78rem;
+.report-body h3 {
+  margin: 1.05rem 0 0.4rem;
+  font-family: 'IBM Plex Serif', serif;
+  font-size: 1.04rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--teal);
-  margin: 0 0 0.65rem;
+  color: #0f3d48;
+  border-bottom: 2px solid #b9d0d6;
+  padding-bottom: 0.3rem;
 }
 
-.results-spacer {
-  height: 1.25rem;
-}
+.report-body h3:first-child { margin-top: 0; }
 
-.report-box {
-  background: rgba(255,255,255,0.92);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 1.25rem 1.35rem 1.35rem;
-  box-shadow: 0 12px 30px rgba(16, 42, 46, 0.05);
-  margin-top: 0.35rem;
-}
-
-.report-box h2 {
-  font-family: 'Fraunces', serif;
-  font-size: 1.18rem;
-  color: var(--teal-deep);
-  margin: 1.15rem 0 0.45rem;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 0.35rem;
-}
-
-.report-box h2:first-child { margin-top: 0; }
-
-.report-box p, .report-box li {
-  color: #24383c;
+.report-body p,
+.report-body li {
+  color: #243841;
+  font-size: 0.93rem;
   line-height: 1.55;
-  font-size: 0.98rem;
 }
 
-.report-box ul {
-  margin: 0.35rem 0 0.7rem 1.1rem;
+.report-body ul {
+  margin: 0.25rem 0 0.65rem 1.05rem;
   padding: 0;
 }
 
-.report-box p { margin: 0.35rem 0 0.55rem; }
+.report-body p { margin: 0.3rem 0 0.5rem; }
 
-.notice {
-  margin-top: 0.9rem;
-  padding: 0.85rem 1rem;
-  border-radius: 12px;
-  background: #fff7e8;
-  border: 1px solid rgba(180, 120, 40, 0.25);
-  color: #6a4a18;
-  font-size: 0.92rem;
+.empty-pane {
+  padding: 2.6rem 1.5rem;
+  color: #5a7380;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  text-align: center;
+  background: linear-gradient(180deg, #f2f8f9 0%, #e4eef1 100%);
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.disclaimer {
+  margin-top: 0.85rem;
+  border: 2px solid var(--warn-line);
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-radius: 10px;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.86rem;
   line-height: 1.45;
 }
 
-.empty-hint {
-  color: var(--muted);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  margin: 0;
-}
-
 div[data-testid="stFileUploader"] section {
-  background: rgba(255,255,255,0.55);
-  border: 1.5px dashed rgba(15, 118, 110, 0.35) !important;
-  border-radius: 14px;
-  padding: 0.5rem;
+  background: #eef6f7 !important;
+  border: 2px dashed #6f8f9a !important;
+  border-radius: 8px !important;
+  padding: 0.4rem;
 }
 
 div[data-testid="stFileUploader"] section:hover {
-  border-color: rgba(15, 118, 110, 0.65) !important;
-  background: rgba(231, 244, 242, 0.65);
+  border-color: var(--accent) !important;
+  background: #e4f3f0 !important;
 }
 
 .stButton > button {
-  background: linear-gradient(145deg, #12857c, #0b4f4a) !important;
-  color: #f4fffd !important;
-  border: none !important;
-  border-radius: 12px !important;
-  padding: 0.7rem 1.4rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.01em;
-  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: var(--accent) !important;
+  color: #f3fffc !important;
+  border: 2px solid var(--accent-deep) !important;
+  border-radius: 8px !important;
+  padding: 0.62rem 1rem !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+  min-height: 2.7rem;
 }
 
 .stButton > button:hover {
-  box-shadow: 0 14px 26px rgba(15, 118, 110, 0.32);
+  background: var(--accent-deep) !important;
   color: #fff !important;
 }
 
-@media (max-width: 768px) {
-  .brand-title { font-size: 1.85rem; }
-  .block-container { padding-top: 3rem !important; }
+@media (max-width: 900px) {
+  .app-bar { flex-direction: column; align-items: flex-start; }
+  .block-container { padding-top: 2.2rem !important; }
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-logo_path = Path("./images/Logo.jpg")
+logo_path = Path("images/Logo.jpg")
 if logo_path.exists():
-    st.markdown('<div class="logo-wrap">', unsafe_allow_html=True)
-    st.image(str(logo_path), width=200)
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        <p class="brand-sub">Upload a medical scan and get a structured AI reading — findings, next steps, and precautions. For support only, not a clinical diagnosis.</p>
-        """,
-        unsafe_allow_html=True,
-    )
+    logo_html = f'<img class="app-bar-logo" src="{to_data_uri(logo_path.read_bytes())}" alt="MediMind" />'
 else:
-    st.markdown(
-        """
-        <div class="brand-wrap">
-          <div class="brand-mark">M</div>
-          <h1 class="brand-title">Medi-Mind AI</h1>
+    logo_html = (
+        '<div class="app-bar-logo" style="display:flex;align-items:center;justify-content:center;'
+        'color:#9fc0c8;font-size:0.72rem;font-weight:700;">MM</div>'
+    )
+
+if api_key:
+    status_html = '<div class="status-chip ok"><span class="status-dot"></span>API connected</div>'
+else:
+    status_html = '<div class="status-chip bad"><span class="status-dot"></span>API key missing</div>'
+
+st.markdown(
+    f"""
+    <div class="app-shell">
+      <div class="app-bar">
+        <div class="app-bar-left">
+          {logo_html}
+          <div class="app-bar-copy">
+            <h1>MediMind</h1>
+            <p>Medical image review workspace</p>
+          </div>
         </div>
-        <p class="brand-sub">Upload a medical scan and get a structured AI reading — findings, next steps, and precautions. For support only, not a clinical diagnosis.</p>
-        """,
-        unsafe_allow_html=True,
-    )
+        {status_html}
+      </div>
+      <div class="control-strip">
+        <p class="section-title">Study input</p>
+    """,
+    unsafe_allow_html=True,
+)
 
-st.write("")
-
-upload_col, action_col = st.columns([2.2, 1], gap="large")
-
+upload_col, action_col = st.columns([2.4, 1], gap="medium")
 with upload_col:
-    st.markdown(
-        '<div class="panel-label">Scan upload</div>',
-        unsafe_allow_html=True,
-    )
     upload_file = st.file_uploader(
-        "Drop a medical image here",
+        "Upload scan",
         type=["png", "jpg", "jpeg"],
         label_visibility="collapsed",
-        help="Supported: PNG, JPG, JPEG",
+        help="PNG, JPG, or JPEG",
     )
-
 with action_col:
-    st.markdown(
-        '<div class="panel-label">Action</div>',
-        unsafe_allow_html=True,
-    )
-    st.caption("Ready when an image is selected.")
-    analyze = st.button("Analyze image", use_container_width=True, type="primary")
+    st.write("")
+    analyze = st.button("Run analysis", use_container_width=True, type="primary")
+
+st.markdown("</div></div>", unsafe_allow_html=True)
 
 if "last_report" not in st.session_state:
     st.session_state.last_report = None
@@ -406,14 +473,16 @@ if "last_image" not in st.session_state:
     st.session_state.last_image = None
 if "last_name" not in st.session_state:
     st.session_state.last_name = None
+if "last_mime" not in st.session_state:
+    st.session_state.last_mime = "image/jpeg"
 
 if analyze:
     if upload_file is None:
-        st.warning("Please upload a medical image first.")
+        st.warning("Upload a medical image before running analysis.")
     elif not model:
         st.error(
-            "API key missing. For local use put it in `api_key.py`. "
-            "On Streamlit Cloud add secret `GEMINI_API_KEY`."
+            "API key missing. Local: set it in `api_key.py`. "
+            "Streamlit Cloud: add secret `GEMINI_API_KEY`."
         )
     else:
         image_data = upload_file.getvalue()
@@ -423,58 +492,85 @@ if analyze:
             system_prompt,
         ]
 
-        with st.spinner("Reading the scan…"):
+        with st.spinner("Analyzing study…"):
             try:
                 response = model.generate_content(prompt_part)
                 st.session_state.last_report = (response.text or "").strip()
                 st.session_state.last_image = image_data
                 st.session_state.last_name = upload_file.name
+                st.session_state.last_mime = mime
             except Exception as exc:
                 message = str(exc)
                 if "429" in message or "ResourceExhausted" in message or "quota" in message.lower():
-                    st.error("Free-tier rate limit reached. Wait about a minute, then try once more.")
+                    st.error("Rate limit reached. Wait about a minute, then try once.")
                 elif "API key" in message or "API_KEY" in message:
                     st.error("API key is missing or invalid.")
                 else:
                     st.error(f"Analysis failed: {message}")
 
-if st.session_state.last_image is not None and st.session_state.last_report:
-    st.markdown('<div class="results-spacer"></div>', unsafe_allow_html=True)
-    st.divider()
-    left, right = st.columns([1, 1.25], gap="large")
+has_result = st.session_state.last_image is not None and st.session_state.last_report
+name = html.escape(st.session_state.last_name or "No study loaded")
 
-    with left:
-        name = html.escape(st.session_state.last_name or "Uploaded image")
+viewer_col, report_col = st.columns([0.95, 1.15], gap="medium")
+
+with viewer_col:
+    if has_result:
+        img_uri = to_data_uri(st.session_state.last_image, st.session_state.last_mime)
         st.markdown(
             f"""
-            <div class="panel">
-              <div class="panel-label">Uploaded scan</div>
-              <p style="margin:0 0 0.75rem;color:var(--muted);font-size:0.9rem;">{name}</p>
+            <div class="pane">
+              <div class="pane-head">
+                <h2>Image viewer</h2>
+                <span class="pane-meta">{name}</span>
+              </div>
+              <div class="viewer-body">
+                <img src="{img_uri}" alt="Uploaded medical scan" />
+              </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="scan-image">', unsafe_allow_html=True)
-        st.image(st.session_state.last_image, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with right:
+    else:
         st.markdown(
             f"""
-            <div class="panel-label">AI clinical report</div>
-            <div class="report-box">
-              {report_to_html(st.session_state.last_report)}
+            <div class="pane">
+              <div class="pane-head">
+                <h2>Image viewer</h2>
+                <span class="pane-meta">{name}</span>
+              </div>
+              <div class="empty-pane">Upload a scan and run analysis to open the study in the viewer.</div>
             </div>
-            <div class="notice"><strong>Important:</strong> Medi-Mind AI is informational only. Always consult a licensed clinician before any medical decision.</div>
             """,
             unsafe_allow_html=True,
         )
-else:
-    st.markdown(
-        """
-        <div class="panel" style="margin-top:1rem;">
-          <p class="empty-hint">Your analyzed scan and structured report will appear here side by side after you click <strong>Analyze image</strong>.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+
+with report_col:
+    if has_result:
+        st.markdown(
+            f"""
+            <div class="pane">
+              <div class="pane-head">
+                <h2>Clinical report</h2>
+                <span class="pane-meta">Draft • AI assisted</span>
+              </div>
+              <div class="report-body">
+                {report_to_html(st.session_state.last_report)}
+              </div>
+            </div>
+            <div class="disclaimer"><strong>Clinical use disclaimer:</strong> Informational support only. Not a substitute for licensed medical judgment.</div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="pane">
+              <div class="pane-head">
+                <h2>Clinical report</h2>
+                <span class="pane-meta">Waiting</span>
+              </div>
+              <div class="empty-pane">Findings, impression, recommendations, and precautions will appear here after analysis.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
