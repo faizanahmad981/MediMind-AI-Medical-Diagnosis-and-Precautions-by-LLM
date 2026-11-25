@@ -2,7 +2,7 @@
 # 🧠 Medi-Mind AI
 ##
 **Medi-Mind AI** is an intelligent web application that leverages Google's Generative AI (`gemini-1.5-flash-002`) to analyze medical images and provide structured diagnostic insights. Built with [Streamlit](https://streamlit.io), this app empowers medical professionals and patients with fast, AI-driven image analysis — while clearly stating its role as a supportive tool, not a replacement for clinical judgment.
-
+#
 ---
 
 ## 🚀 Features
