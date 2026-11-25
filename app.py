@@ -170,42 +170,13 @@ html, body, [class*="css"] {
 
 #MainMenu, footer { visibility: hidden; }
 
-/* Center Streamlit floating toolbar on scroll */
+/* Leave Streamlit system toolbar alone — do not restyle it */
 header[data-testid="stHeader"] {
   background: transparent !important;
-  height: auto !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: flex-start !important;
-  padding-top: 0.85rem !important;
-}
-
-div[data-testid="stToolbar"] {
-  position: fixed !important;
-  top: 0.85rem !important;
-  left: 50% !important;
-  right: auto !important;
-  transform: translateX(-50%) !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 0.15rem;
-  background: rgba(243, 248, 249, 0.92) !important;
-  border: 2px solid #5f818c !important;
-  border-radius: 999px !important;
-  padding: 0.28rem 0.55rem !important;
-  box-shadow: 0 10px 28px rgba(10, 35, 42, 0.18) !important;
-  backdrop-filter: blur(10px);
-  z-index: 999999 !important;
-  max-width: calc(100vw - 1.5rem);
-}
-
-div[data-testid="stDecoration"] {
-  display: none !important;
 }
 
 .block-container {
-  padding-top: 4.25rem !important;
+  padding-top: 2.75rem !important;
   padding-bottom: 3rem !important;
   max-width: 1200px !important;
   overflow: visible !important;
@@ -443,11 +414,7 @@ div[data-testid="stFileUploader"] section:hover {
 
 @media (max-width: 900px) {
   .app-bar { flex-direction: column; align-items: flex-start; }
-  .block-container { padding-top: 4rem !important; }
-  div[data-testid="stToolbar"] {
-    top: 0.65rem !important;
-    width: auto;
-  }
+  .block-container { padding-top: 2.2rem !important; }
 }
 </style>
 """,
